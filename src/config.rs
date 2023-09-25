@@ -1,22 +1,20 @@
 use std::collections::HashSet;
 
-use crate::{cigar::EqualityPair, mode::AlignMode, task::AlignTask};
+use crate::{equal::EqualityPair, mode::AlignMode, task::AlignTask};
 
 #[derive(Debug, Clone)]
 /// Alignment configuration.
 /// * `additionalEqualitiesLength` not necessary because of Rust's storage of container metadata.
 pub struct AlignConfig {
-    /// If non-negative:
-    /// * Edit distance is not larget than `k`.
-    ///
-    /// If small:
-    /// * Improve speed of computation.
-    ///
-    /// If smaller than edit distance:
-    /// * Edit distance will be reduced to `-1`.
-    ///
-    /// If negative:
-    /// * `k` will be auto-adjusted until a score is found.
+    /// Limits search space of possible solutions.
+    /// * If non-negative:
+    ///     * Edit distance is not larget than `k`.
+    /// * If small:
+    ///     * Improve speed of computation.
+    /// * If smaller than edit distance:
+    ///     * Edit distance will be reduced to `-1`.
+    /// * If negative:
+    ///     * `k` will be auto-adjusted until a score is found.
     pub k: isize,
     /// Alignment method, [`AlignMode`].
     pub mode: AlignMode,
@@ -24,7 +22,7 @@ pub struct AlignConfig {
     pub task: AlignTask,
     /// List of pairs of characters as an [`EqualityPair`], where each pair defines two characters as equal.
     /// * Allows extension of the lib's definition of equality.
-    pub added_equalities: HashSet<EqualityPair>,
+    pub added_equalities: Vec<EqualityPair>,
 }
 
 impl Default for AlignConfig {

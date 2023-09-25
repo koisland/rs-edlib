@@ -27,12 +27,3 @@ pub enum EditOp {
     // Mismatch
     Mismatch,
 }
-
-#[derive(Debug, Clone)]
-/// Defines two given characters as equal.
-pub struct EqualityPair {
-    // First character.
-    pub first: char,
-    // Second character.
-    pub second: char,
-}
