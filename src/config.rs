@@ -2,20 +2,25 @@ use std::collections::HashSet;
 
 use crate::{equal::EqualityPair, mode::AlignMode, task::AlignTask};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 /// Alignment configuration.
 /// * `additionalEqualitiesLength` not necessary because of Rust's storage of container metadata.
 pub struct AlignConfig {
-    /// Limits search space of possible solutions.
-    /// * If non-negative:
+    /// Threshold number of differences between target and query. Limits search space of possible solutions.
+    ///
+    /// **If**:
+    /// * Non-negative:
     ///     * Edit distance is not larget than `k`.
-    /// * If small:
-    ///     * Improve speed of computation.
-    /// * If smaller than edit distance:
-    ///     * Edit distance will be reduced to `-1`.
-    /// * If negative:
+    /// * None:
     ///     * `k` will be auto-adjusted until a score is found.
-    pub k: isize,
+    /// * Small:
+    ///     * Improve speed of computation.
+    /// * Smaller than edit distance:
+    ///     * Edit distance will be reduced to `-1`.
+    ///
+    /// https://dl.acm.org/doi/abs/10.1145/316542.316550 \[1\]
+    ///
+    pub k: Option<usize>,
     /// Alignment method, [`AlignMode`].
     pub mode: AlignMode,
     /// Alignment task, [`AlignTask`].
@@ -23,15 +28,4 @@ pub struct AlignConfig {
     /// List of pairs of characters as an [`EqualityPair`], where each pair defines two characters as equal.
     /// * Allows extension of the lib's definition of equality.
     pub added_equalities: Vec<EqualityPair>,
-}
-
-impl Default for AlignConfig {
-    fn default() -> Self {
-        Self {
-            k: -1,
-            mode: Default::default(),
-            task: Default::default(),
-            added_equalities: Default::default(),
-        }
-    }
 }

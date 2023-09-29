@@ -11,7 +11,7 @@ pub struct EqualityPair {
     pub second: char,
 }
 
-/// Defines equality realtion on alphabet characters.
+/// Defines equality relation on alphabet characters.
 #[derive(Debug, Clone)]
 pub struct EqualityDefinition {
     alphabet: String,
@@ -19,19 +19,23 @@ pub struct EqualityDefinition {
 }
 
 impl EqualityDefinition {
-    /// Initialize a new equality definition.
+    /// Initialize a new `EqualityDefinition`.
+    ///
+    /// # Arguments
     /// * `alphabet`: All possible characters.
     /// * `added_equalities`: Additional equalities to add. Characters must exist within alphabet.
     ///
-    /// -----
-    /// ### Example: No added equalities.
+    /// # Returns
+    /// * New instance of `EqualityDefinition`.
+    ///
+    /// # Examples
+    /// No added equalities.
     /// ```
     /// use rs_edlib::equal::EqualityDefinition;
     ///
     /// let eq_def = EqualityDefinition::new("ATGC", None);
     /// ```
-    /// -----
-    /// ### Example: Make `A` also equal `T`.
+    /// Make `A` also equal `T`.
     /// ```
     /// use rs_edlib::equal::{EqualityDefinition, EqualityPair};
     ///
@@ -73,18 +77,22 @@ impl EqualityDefinition {
     }
 
     /// Check if characters are equivalent.
-    /// * **Panics if characters do not exist in initialized alphabet.**
-    /// -----
-    /// ### Example: Normal usage
+    ///
+    /// # Arguments
+    /// * `a`: Character.
+    /// * `b`: Character
+    ///
+    /// # Examples
+    ///
+    /// Normal usage.
     /// ```
     /// use rs_edlib::equal::EqualityDefinition;
     ///
     /// let eq_def = EqualityDefinition::new("ATGC", None);
     /// assert!(eq_def.are_equal('T', 'T'));
     /// ```
-    /// -----
     ///
-    /// ### Example: Invalid character.
+    /// Invalid character.
     /// ```should_panic
     /// use rs_edlib::equal::EqualityDefinition;
     /// ///
@@ -102,11 +110,19 @@ impl EqualityDefinition {
         Ok(self[(pos_x, pos_y)])
     }
 
+    /// Get symbol in alphabet by index.
+    ///
+    /// # Arguments
+    /// * `index`: Index of character in alphabet.
+    ///
+    /// # Returns
+    /// * Character in alphabet, if exists.
     pub fn symbol(&self, index: usize) -> Option<char> {
         self.alphabet.chars().nth(index)
     }
 }
 
+/// Index into `EqualityDefinition` matrix by (row, col).
 impl Index<(usize, usize)> for EqualityDefinition {
     type Output = bool;
 
@@ -153,5 +169,22 @@ mod test {
     fn test_equality_definition_check_invalid_equal() {
         let eq_def = EqualityDefinition::new("ATGC", None);
         assert!(eq_def.are_equal('X', 'X').is_err());
+    }
+
+    #[test]
+    fn test_equality_definition_index() {
+        let eq_def = EqualityDefinition::new("ATGC", None);
+        // T == T. T is at position 1.
+        assert!(eq_def[(1, 1)]);
+        // T != G. T is at position 1. G is at position 2.
+        assert!(!eq_def[(1, 2)]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_equality_invalid_definition_index() {
+        let eq_def = EqualityDefinition::new("ATGC", None);
+        // 7 is not a valid position in matrix.
+        assert!(eq_def[(7, 7)]);
     }
 }
