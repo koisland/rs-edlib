@@ -64,10 +64,10 @@ impl Alignment {
             return Ok(());
         }
 
-        let upper_k_bound = std::cmp::min(k, std::cmp::max(query_len, target.len()));
+        let mut k = std::cmp::min(k, std::cmp::max(query_len, target.len()));
 
         // 0-based index of first block of Ukkonen band.
-        let first_block_idx = 0;
+        let mut first_block_idx = 0;
 
         /*
         Cleaned up from https://github.com/Martinsos/edlib/blob/master/edlib/src/edlib.cpp#L755C21-L755C112
@@ -85,7 +85,7 @@ impl Alignment {
         */
         // 0-based index of last block of Ukkonen band.
         // The cells below the band.
-        let last_block_idx = std::cmp::min(
+        let mut last_block_idx = std::cmp::min(
             max_num_blocks,
             std::cmp::min(k, (k + query_len - target.len() / 2) + 1) / usize::try_from(WORD_SIZE)?,
         ) - 1;
@@ -109,7 +109,7 @@ impl Alignment {
 
         // Iterate thru columns.
         for (idx, c) in target.iter().enumerate() {
-            let peq_c = peq[idx + *c * max_num_blocks];
+            let idx_col = idx + *c * max_num_blocks;
 
             // Init to hout of 1. Can range from 0, 1, and -1.
             let mut hout: isize = 1;
@@ -119,20 +119,15 @@ impl Alignment {
             // * horizontal delta hin (hout, init to 1)
             // Makes the resulting vertical delta the current one
             // Returning the horizontal output delta, hout.
-            for block in blocks
-                .get_mut(first_block_idx..=last_block_idx)
-                .with_context(|| {
-                    format!("Invalid first {first_block_idx} or last {last_block_idx} block for blocks.")
-                })?
-                .iter_mut()
-            {
+            for block_idx in first_block_idx..=last_block_idx {
+                let block = &mut blocks[block_idx];
+                let peq_c = peq[idx_col + block_idx];
+
                 hout = block.calculate_hout_delta(peq_c, hout)?;
                 block.score += hout;
             }
 
-            let Some(last_block) = blocks.get_mut(last_block_idx) else {
-                bail!("Missing last block.")
-            };
+            let mut last_block = &mut blocks[last_block_idx];
             // Update k. I do it only on end of column because it would slow calculation too much otherwise. (Martinsos)
             // NOTICE: I add W when in last block because it is actually result from W cells to the left and W cells up. (Martinsos)
             /*
@@ -146,17 +141,95 @@ impl Alignment {
                 )
                 + (lastBlock == maxNumBlocks - 1 ? W : 0)
             */
-            let cmp = if last_block_idx == max_num_blocks - 1 {
-                w
-            } else {
-                0
-            };
-            let cmp = std::cmp::max(
-                target.len() - *c - 1,
-                query_len - ((1 + last_block_idx) * word_size - 1) - 1,
-            ) + cmp;
-            let cmp = last_block.score + isize::try_from(cmp)?;
-            let new_k = std::cmp::min(k.try_into()?, cmp);
+            let cmp = last_block.score
+                + isize::try_from(
+                    std::cmp::max(
+                        target.len() - *c - 1,
+                        query_len - ((1 + last_block_idx) * word_size - 1) - 1,
+                    ) + if last_block_idx == max_num_blocks - 1 {
+                        w
+                    } else {
+                        0
+                    },
+                )?;
+            k = std::cmp::min(k, cmp.try_into()?);
+
+            // Adjust number of blocks accoring to Ukkonen (Martinsos)
+            // Adjust last block (Martinsos)
+            // If block is not beneath band, calculate next block. Only next because others are certainly beneath band. (Martinsos)
+            if last_block_idx + 1 < max_num_blocks
+                && (last_block_idx + 1) * word_size - 1
+                    <= k - usize::try_from(last_block.score)? + 2 * word_size - 2 - target.len()
+                        + c
+                        + query_len
+            {
+                let prev_block_score = blocks[last_block_idx].score;
+                // Next block.
+                last_block_idx += 1;
+                last_block = &mut blocks[last_block_idx];
+                last_block.p = Word::MAX;
+                last_block.m = 0;
+                // Get eq for column.
+                let peq_c = peq[idx_col + last_block_idx];
+
+                let new_hout = last_block.calculate_hout_delta(peq_c, hout)?;
+                last_block.score = prev_block_score - hout + isize::try_from(word_size)? + new_hout;
+                hout = new_hout
+            }
+
+            // While block is out of band, move one block up. (Martinsos)
+            // NOTE: Condition used here is more loose than the one from the article, since I simplified the max() part of it. (Martinsos)
+            // I could consider adding that max part, for optimal performance. (Martinsos)
+            while last_block_idx >= first_block_idx
+                && last_block.score >= (k + word_size).try_into()?
+                || (last_block_idx + 1) * word_size - 1
+                    > k - usize::try_from(last_block.score)? + 2 * word_size - 2 - target.len()
+                        + c
+                        + query_len
+                        + 1
+            {
+                last_block_idx -= 1;
+                last_block = &mut blocks[last_block_idx];
+            }
+            // Adjust first block (Martinsos)
+            // While outside of band, advance block (Martinsos)
+            while first_block_idx <= last_block_idx
+                && (blocks[first_block_idx].score >= (k + word_size).try_into()?
+                    || ((first_block_idx + 1) * word_size - 1
+                        < (blocks[first_block_idx].score
+                            - isize::try_from(k - target.len() + query_len + c)?)
+                        .try_into()?))
+            {
+                first_block_idx += 1;
+            }
+
+            // TODO: consider if this part is useful, it does not seem to help much
+            if c % STRONG_REDUCE_NUM == 0 {
+                // Every some columns do more expensive but more efficient reduction
+                'outer: while last_block_idx >= first_block_idx {
+                    // If all cells outside of band remove block.
+                    let scores = blocks[last_block_idx].get_cell_values();
+                    let num_cells = if last_block_idx == max_num_blocks - 1 {
+                        word_size - w
+                    } else {
+                        word_size
+                    };
+                    let mut r = last_block_idx * word_size + num_cells - 1;
+                    let k: isize = k.try_into()?;
+
+                    for score in scores.iter().take(word_size).skip(word_size - num_cells) {
+                        // TODO: Does not work if do not put +1! Why???
+                        if (*score <= k)
+                            && (isize::try_from(r)?
+                                <= k - score - isize::try_from(target.len() + c + query_len)? + 1)
+                        {
+                            break 'outer;
+                        }
+                        r -= 1;
+                    }
+                    last_block_idx -= 1;
+                }
+            }
         }
         Ok(())
     }

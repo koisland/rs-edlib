@@ -167,6 +167,7 @@ impl Alignment {
         let peq = build_peq_table(alphabet.len(), &transformed_query, &equality_def)?;
 
         // Main Calculation
+        let mut position_nw = None;
         let mut align_data = AlignmentData::new(max_num_blocks, target.len());
         let mut dynamic_k = false;
         let mut k = config.k.unwrap_or_else(|| {
@@ -177,13 +178,12 @@ impl Alignment {
         loop {
             match config.mode {
                 AlignMode::NW => {
-                    let mut position_nw = None;
                     alignment.calc_edit_dst_nw(
                         &peq,
                         w,
                         max_num_blocks,
-                        query.len(),
-                        &transformed_query,
+                        transformed_query.len(),
+                        &transformed_target,
                         k,
                         position_nw.as_mut(),
                         Some(&mut align_data),
@@ -194,8 +194,8 @@ impl Alignment {
                     &peq,
                     w,
                     max_num_blocks,
-                    query.len(),
-                    &transformed_query,
+                    transformed_query.len(),
+                    &transformed_target,
                     k,
                     &config.mode,
                 ),

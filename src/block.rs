@@ -55,4 +55,35 @@ impl Block {
         self.m = ph & xv;
         Ok(hout)
     }
+
+    /// Get score values for `Block`.
+    pub fn get_cell_values(&self) -> Vec<isize> {
+        let mut scores = vec![];
+        let mut score = self.score;
+        // Mask shifted to go through block p and m by each bit modifying score.
+        let mut mask = HIGH_BIT_MASK;
+
+        // Iterate through word calculating score.
+        for _ in 0..WORD_SIZE - 1 {
+            scores.push(score);
+
+            // Look at the pvin and mvin of the bottom cell of block from column. i.e. 100..00.
+            if self.p & HIGH_BIT_MASK != 0 {
+                score -= 1
+            }
+            if self.m & HIGH_BIT_MASK != 0 {
+                score += 1
+            }
+            // Then keep moving mask up the column.
+            // 100..00 -> 010..00
+            mask >>= 1;
+        }
+        if let Some(old_score) = scores.get_mut(WORD_SIZE as usize - 1) {
+            *old_score = score
+        } else {
+            scores.push(score)
+        }
+
+        scores
+    }
 }
