@@ -86,4 +86,16 @@ impl Block {
 
         scores
     }
+
+    /// Check if all block cell values are larger than `k`.
+    /// # Arguments
+    /// * `k`: Threshold value to compare values.
+    /// # Returns
+    /// * If all cells in block have value larger than `k`.
+    pub fn all_block_cells_larger(&self, k: isize) -> bool {
+        self.get_cell_values()
+            .into_iter()
+            .take(WORD_SIZE as usize)
+            .all(|val| val > k)
+    }
 }

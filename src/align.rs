@@ -82,21 +82,21 @@ pub fn transform_sequences(query: &str, target: &str) -> (String, Vec<usize>, Ve
 }
 
 pub struct AlignmentData {
-    pub ps: Vec<Word>,
-    pub ms: Vec<Word>,
-    pub scores: Vec<usize>,
-    pub first_blocks: Vec<usize>,
-    pub last_blocks: Vec<usize>,
+    pub ps: Vec<Option<Word>>,
+    pub ms: Vec<Option<Word>>,
+    pub scores: Vec<Option<isize>>,
+    pub first_blocks: Vec<Option<usize>>,
+    pub last_blocks: Vec<Option<usize>>,
 }
 
 impl AlignmentData {
     pub fn new(max_num_blocks: usize, target_len: usize) -> Self {
         AlignmentData {
-            ps: Vec::with_capacity(max_num_blocks * target_len),
-            ms: Vec::with_capacity(max_num_blocks * target_len),
-            scores: Vec::with_capacity(max_num_blocks * target_len),
-            first_blocks: Vec::with_capacity(target_len),
-            last_blocks: Vec::with_capacity(target_len),
+            ps: vec![None; max_num_blocks * target_len],
+            ms: vec![None; max_num_blocks * target_len],
+            scores: vec![None; max_num_blocks * target_len],
+            first_blocks: vec![None; target_len],
+            last_blocks: vec![None; target_len],
         }
     }
 }
@@ -198,7 +198,7 @@ impl Alignment {
                     &transformed_target,
                     k,
                     &config.mode,
-                ),
+                )?,
             };
 
             k *= 2;

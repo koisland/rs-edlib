@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 /// How to treat gaps before and after query?
 pub enum AlignMode {
     #[default]
