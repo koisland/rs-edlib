@@ -152,7 +152,7 @@ impl Alignment {
                             // Change k so we will only look for equal or better scores than the best found so far.
                             k = col_score;
                         }
-                        positions.push((c - w).try_into()?)
+                        positions.push(isize::try_from(*c)? - isize::try_from(w)?)
                     }
                 }
             }
@@ -173,7 +173,10 @@ impl Alignment {
                         k = col_score;
                         best_score = Some(col_score.try_into()?)
                     }
-                    positions.push((target.len() - w + block_score_idx).try_into()?)
+                    positions.push(
+                        isize::try_from(target.len())? - isize::try_from(w)?
+                            + isize::try_from(block_score_idx)?,
+                    )
                 }
             }
         }

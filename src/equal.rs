@@ -14,7 +14,7 @@ pub struct EqualityPair {
 /// Defines equality relation on alphabet characters.
 #[derive(Debug, Clone)]
 pub struct EqualityDefinition {
-    alphabet: String,
+    pub(crate) alphabet: String,
     matrix: Vec<bool>,
 }
 

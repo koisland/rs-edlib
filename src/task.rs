@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 /// What should rs_edlib do?
 pub enum AlignTask {
     #[default]

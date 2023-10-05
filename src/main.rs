@@ -8,7 +8,7 @@ pub mod mode;
 pub mod peq;
 pub mod task;
 
-#[deny(missing_docs)]
+#[warn(missing_docs)]
 
 fn main() {
     println!("Hello, world!");

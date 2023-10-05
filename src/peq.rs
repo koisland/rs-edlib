@@ -77,9 +77,8 @@ pub fn build_peq_table(
 }
 
 mod test {
-    use crate::align::transform_sequences;
-
     use super::*;
+    use crate::align::transform_sequences;
 
     #[test]
     fn test_build_peq_table() {

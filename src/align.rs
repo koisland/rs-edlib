@@ -1,6 +1,8 @@
+use anyhow::bail;
+
 use crate::{
     cigar::EditOp, config::AlignConfig, equal::EqualityDefinition, mode::AlignMode,
-    peq::build_peq_table,
+    peq::build_peq_table, task::AlignTask,
 };
 
 pub type Word = u64;
@@ -208,11 +210,126 @@ impl Alignment {
             }
         }
 
-        if let Some(dst) = alignment.edit_distance {}
+        // If there is a solution.
+        if alignment.edit_distance.is_some() {
+            // If NW mode, set end location explicitly.
+            if config.mode == AlignMode::NW {
+                alignment.end_locations = Some(vec![(transformed_target.len() - 1).try_into()?])
+            }
 
+            if matches!(config.task, AlignTask::Loc | AlignTask::Path) {
+                if config.mode == AlignMode::HW {
+                    let rev_transformed_target: Vec<usize> =
+                        transformed_target.iter().rev().copied().collect();
+                    let rev_transformed_query: Vec<usize> =
+                        transformed_query.iter().rev().copied().collect();
+
+                    let rev_peq =
+                        build_peq_table(alphabet.len(), &rev_transformed_query, &equality_def)?;
+                    for (i, loc) in alignment
+                        .end_locations
+                        .as_ref()
+                        .expect("No end locations.")
+                        .iter()
+                        .enumerate()
+                    {
+                        if *loc == -1 {
+                            // NOTE: Sometimes one of optimal solutions is that query starts before target, like this:
+                            //                       AAGG <- target
+                            //                   CCTT     <- query
+                            //   It will never be only optimal solution and it does not happen often, however it is
+                            //   possible and in that case end location will be -1. What should we do with that?
+                            //   Should we just skip reporting such end location, although it is a solution?
+                            //   If we do report it, what is the start location? -4? -1? Nothing?
+                            // TODO: Figure this out. This has to do in general with how we think about start
+                            //   and end locations.
+                            //   Also, we have alignment later relying on this locations to limit the space of it's
+                            //   search -> how can it do it right if these locations are negative or incorrect?
+                            // I put 0 for now, but it does not make much sense.
+                            if let Some(start_locs) = alignment.start_locations.as_mut() {
+                                start_locs[i] = 0; // I put 0 for now, but it does not make much sense.
+                            }
+                        } else {
+                            // TODO: Check index.
+                            let rev_target_idx =
+                                transformed_target.len() - usize::try_from(*loc)? - 1;
+                            let mut rev_alignment = Alignment::default();
+                            rev_alignment.calc_edit_dst_semi_global(
+                                &rev_peq,
+                                w,
+                                max_num_blocks,
+                                rev_transformed_query.len(),
+                                &[rev_transformed_target[rev_target_idx]],
+                                alignment.edit_distance.unwrap(),
+                                &AlignMode::SHW,
+                            )?;
+
+                            if let (Some(start_locs), Some(rev_last_loc)) = (
+                                alignment.start_locations.as_mut(),
+                                rev_alignment.end_locations.map(|locs| locs[locs.len() - 1]),
+                            ) {
+                                // Taking last location as start ensures that alignment will not start with insertions
+                                // if it can start with mismatches instead.
+                                start_locs[i] = loc - rev_last_loc;
+                            }
+                        }
+                    }
+                } else {
+                    // If mode is SHW or NW
+                    if let Some(start_locs) = alignment.start_locations.as_mut() {
+                        for loc in start_locs.iter_mut() {
+                            *loc = 0
+                        }
+                    }
+                }
+            }
+        }
+        // Find alignment -> all comes down to finding alignment for NW.
+        // Currently we return alignment only for first pair of locations.
+        if config.task == AlignTask::Path {
+            let (Some(aln_start_loc), Some(aln_end_loc))= (
+                alignment.start_locations.as_ref().map(|start_locs| start_locs[0]),
+                alignment.end_locations.as_ref().map(|end_locs| end_locs[0])
+            ) else {
+                bail!("No start locations.")
+            };
+            let adj_range = usize::try_from(aln_start_loc)?..usize::try_from(aln_end_loc)?;
+            let aln_target = &transformed_target[adj_range];
+            alignment.obtain_optimal_path(&transformed_query, aln_target, &equality_def)?;
+        }
         Ok(alignment)
     }
 
+    fn obtain_optimal_path(
+        &mut self,
+        query: &[usize],
+        target: &[usize],
+        equality_def: &EqualityDefinition,
+    ) -> anyhow::Result<()> {
+        // Create reversed copies.
+        let rev_query = query.iter().rev();
+        let rev_target = target.iter().rev();
+
+        // Get alpha len.
+        let alphabet_len = equality_def.alphabet.len();
+
+        // Special case.
+        if let Some(empty_seq_op) = if query.is_empty() {
+            Some(EditOp::Delete)
+        } else if target.is_empty() {
+            Some(EditOp::Insert)
+        } else {
+            None
+        } {
+            self.alignment = Some(vec![empty_seq_op; target.len() + query.len()]);
+            return Ok(());
+        }
+
+        let word_size = usize::try_from(WORD_SIZE)?;
+        let max_num_blocks = query.len() / word_size;
+        let w = max_num_blocks * word_size - query.len();
+        Ok(())
+    }
     // pub fn as_cigar(format: CigarFormat) {}
 }
 

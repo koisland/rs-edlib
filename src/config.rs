@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use crate::{equal::EqualityPair, mode::AlignMode, task::AlignTask};
 
 #[derive(Debug, Clone, Default)]

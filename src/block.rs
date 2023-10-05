@@ -37,9 +37,8 @@ impl Block {
         let mut ph = self.m | !(xh | self.p);
         let mut mh = self.p & xh;
 
-        let mut hout: isize = 0;
         // This is instruction below written using 'if': if (Ph & HIGH_BIT_MASK) hout = 1;
-        hout = ((ph & HIGH_BIT_MASK) >> (WORD_SIZE - 1)).try_into()?;
+        let mut hout = ((ph & HIGH_BIT_MASK) >> (WORD_SIZE - 1)).try_into()?;
         // This is instruction below written using 'if': if (Mh & HIGH_BIT_MASK) hout = -1;
         hout -= TryInto::<isize>::try_into((mh & HIGH_BIT_MASK) >> (WORD_SIZE - 1))?;
 
@@ -68,10 +67,10 @@ impl Block {
             scores.push(score);
 
             // Look at the pvin and mvin of the bottom cell of block from column. i.e. 100..00.
-            if self.p & HIGH_BIT_MASK != 0 {
+            if self.p & mask != 0 {
                 score -= 1
             }
-            if self.m & HIGH_BIT_MASK != 0 {
+            if self.m & mask != 0 {
                 score += 1
             }
             // Then keep moving mask up the column.
