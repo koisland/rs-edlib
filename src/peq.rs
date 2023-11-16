@@ -1,6 +1,6 @@
 use crate::{
     align::{Word, WORD_SIZE},
-    equal::EqualityDefinition,
+    equal::EqualityDefinition, ceil_div,
 };
 
 /// Build Peq (query profile) table for given transformed query and alphabet.
@@ -30,7 +30,7 @@ pub fn build_peq_table(
         idx = 0 * 31 + 0 -> 0
     */
     let word_size = usize::try_from(WORD_SIZE)?;
-    let max_num_blocks = query.len() / word_size;
+    let max_num_blocks = ceil_div!(query.len(), word_size);
     // Table of dimensions:
     // * (alphabet_length + 1) x max_num_blocks.
     // Last symbol is a wildcard?
@@ -44,17 +44,16 @@ pub fn build_peq_table(
                 let idx = symbol * max_num_blocks + block;
                 peq_table[idx] = 0;
 
-                let r = (block + 1) * word_size - 1;
+                let r = (block + 1) * word_size;
 
                 for r in (0..r).rev().filter(|r| *r >= block * word_size) {
-                    // Cast query u8 byte at r into char.
-                    // NOTE: Can panic.
-                    let Some(Some(r_char)) = query.get(r).map(|c| equality_def.symbol(*c)) else {
-                        eprintln!("Cannot get query elem at {r}.");
-                        continue;
-                    };
-
+                    
                     peq_table[idx] <<= 1;
+
+                    // This is C++ pointer indexing behavior (query[r])? wtf just defaults to 0?
+                    let r_char_idx = query.get(r).cloned().unwrap_or(0);
+                    // Cast query u8 byte at r into char.
+                    let r_char = equality_def.symbol(r_char_idx).unwrap();
 
                     // If position is greater than query len, treat as wildcard and pad with W wildcard symbols?
                     // - OR -

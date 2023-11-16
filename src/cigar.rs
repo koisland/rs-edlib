@@ -8,6 +8,7 @@ pub enum CigarFormat {
     Extended,
 }
 
+
 #[derive(Debug, Clone, Copy)]
 pub enum EditOp {
     /// Match
@@ -24,6 +25,6 @@ pub enum EditOp {
     /// * Target: `A-CG`
     /// * Query:  `ATCG`
     Delete,
-    // Mismatch
+    /// Mismatch
     Mismatch,
 }

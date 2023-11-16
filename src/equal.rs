@@ -2,12 +2,14 @@ use std::ops::Index;
 
 use anyhow::{bail, Context};
 
+use crate::align::MAX_UCHAR;
+
 #[derive(Debug, Clone)]
 /// Defines two given characters as equal.
 pub struct EqualityPair {
-    // First character.
+    /// First character.
     pub first: char,
-    // Second character.
+    /// Second character.
     pub second: char,
 }
 
@@ -45,11 +47,17 @@ impl EqualityDefinition {
     /// );
     /// ```
     pub fn new(alphabet: &str, added_equalities: Option<&[EqualityPair]>) -> Self {
-        let mut matrix = Vec::with_capacity(alphabet.len() * alphabet.len());
+        let mut matrix = vec!(false; MAX_UCHAR * MAX_UCHAR);
 
+        // (1,2) = 7
+        /*
+            * * * 
+            * * *
+            * * *
+        */
         for x in 0..alphabet.len() {
             for y in 0..alphabet.len() {
-                matrix.push(x == y)
+                matrix[(y * alphabet.len()) + x] = x == y
             }
         }
 

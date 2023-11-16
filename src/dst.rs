@@ -3,10 +3,10 @@ use anyhow::bail;
 use crate::{
     align::{Alignment, AlignmentData, Word, WORD_1, WORD_SIZE},
     block::Block,
-    mode::AlignMode,
+    mode::AlignMode, ceil_div,
 };
 
-// Each column is reduced in more expensive way.
+/// Each column is reduced in more expensive way.
 pub const STRONG_REDUCE_NUM: usize = 2048;
 
 impl Alignment {
@@ -35,7 +35,7 @@ impl Alignment {
         let int_word_size = isize::try_from(word_size)?;
 
         let mut first_block_idx = 0;
-        let mut last_block_idx = std::cmp::min(k + 1 / word_size, max_num_blocks);
+        let mut last_block_idx = std::cmp::min(ceil_div!(k + 1, word_size), max_num_blocks);
 
         // Initialize blocks to some score and default bit vecs.
         let mut blocks: Vec<Block> = (0..=last_block_idx)
@@ -252,7 +252,7 @@ impl Alignment {
         // The cells below the band.
         let mut last_block_idx = std::cmp::min(
             max_num_blocks,
-            std::cmp::min(k, (k + query_len - target.len() / 2) + 1) / word_size,
+            ceil_div!(std::cmp::min(k, (k + query_len - target.len() / 2) + 1), word_size),
         ) - 1;
 
         // Initialize blocks to some score and default bit vecs.
@@ -273,8 +273,8 @@ impl Alignment {
         // }
 
         // Iterate thru columns.
-        for (idx, c) in target.iter().enumerate() {
-            let col_idx = idx + *c * max_num_blocks;
+        for c in target.iter() {
+            let col_idx = *c * max_num_blocks;
 
             // Init to hout of 1. Can range from 0, 1, and -1.
             let mut hout: isize = 1;

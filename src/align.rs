@@ -2,15 +2,21 @@ use anyhow::bail;
 
 use crate::{
     cigar::EditOp, config::AlignConfig, equal::EqualityDefinition, mode::AlignMode,
-    peq::build_peq_table, task::AlignTask,
+    peq::build_peq_table, task::AlignTask, ceil_div,
 };
 
+/// Alias for single u64 bitvec word.
 pub type Word = u64;
+
 /// Size of word in bits.
 pub const WORD_SIZE: u32 = Word::BITS;
+
+/// Word for 000...1
 pub const WORD_1: Word = 1;
-// 100..00
+
+/// Word bit mask. 100..00
 pub const HIGH_BIT_MASK: Word = WORD_1 << (WORD_SIZE - 1);
+
 /// Max chars we expect. Note is ASCII only.
 pub const MAX_UCHAR: usize = 256;
 
@@ -43,6 +49,7 @@ pub struct Alignment {
     pub alphabet_length: usize,
 }
 
+/// Transform sequences to sequences of indices.
 pub fn transform_sequences(query: &str, target: &str) -> (String, Vec<usize>, Vec<usize>) {
     let mut alphabet = String::new();
 
@@ -92,6 +99,7 @@ pub struct AlignmentData {
 }
 
 impl AlignmentData {
+    /// Init data.
     pub fn new(max_num_blocks: usize, target_len: usize) -> Self {
         AlignmentData {
             ps: vec![None; max_num_blocks * target_len],
@@ -110,7 +118,7 @@ impl Alignment {
     /// * @param `query`: First sequence.
     /// * @param `target`: Second sequence.
     ///
-    /// ### Exampleq
+    /// ### Example
     /// ```
     /// use rs_edlib::{align::Alignment, config::AlignConfig};
     ///
@@ -162,7 +170,7 @@ impl Alignment {
 
         // Initialization
         // B_max
-        let max_num_blocks = transformed_query.len() / word_size;
+        let max_num_blocks = ceil_div!(transformed_query.len(), word_size);
         // Number of redundant cells in last level blocks.
         let w = max_num_blocks * word_size - transformed_query.len();
         let equality_def = EqualityDefinition::new(&alphabet, Some(&config.added_equalities));
@@ -326,7 +334,7 @@ impl Alignment {
         }
 
         let word_size = usize::try_from(WORD_SIZE)?;
-        let max_num_blocks = query.len() / word_size;
+        let max_num_blocks = ceil_div!(query.len(), word_size);
         let w = max_num_blocks * word_size - query.len();
         Ok(())
     }

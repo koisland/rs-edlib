@@ -5,3 +5,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.75"
+
+[lib]
+name = "rs_edlib"
+path = "src/lib.rs"
