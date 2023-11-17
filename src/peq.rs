@@ -1,6 +1,7 @@
 use crate::{
     align::{Word, WORD_SIZE},
-    equal::EqualityDefinition, ceil_div,
+    ceil_div,
+    equal::EqualityDefinition,
 };
 
 /// Build Peq (query profile) table for given transformed query and alphabet.
@@ -47,7 +48,6 @@ pub fn build_peq_table(
                 let r = (block + 1) * word_size;
 
                 for r in (0..r).rev().filter(|r| *r >= block * word_size) {
-                    
                     peq_table[idx] <<= 1;
 
                     // This is C++ pointer indexing behavior (query[r])? wtf just defaults to 0?

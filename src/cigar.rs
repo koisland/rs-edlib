@@ -8,7 +8,6 @@ pub enum CigarFormat {
     Extended,
 }
 
-
 #[derive(Debug, Clone, Copy)]
 pub enum EditOp {
     /// Match

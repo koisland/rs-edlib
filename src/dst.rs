@@ -3,7 +3,8 @@ use anyhow::bail;
 use crate::{
     align::{Alignment, AlignmentData, Word, WORD_1, WORD_SIZE},
     block::Block,
-    mode::AlignMode, ceil_div,
+    ceil_div,
+    mode::AlignMode,
 };
 
 /// Each column is reduced in more expensive way.
@@ -212,12 +213,12 @@ impl Alignment {
         query_len: usize,
         target: &[usize],
         k: usize,
-        mut position: Option<&mut usize>,
+        position: &mut Option<usize>,
         mut align_data: Option<&mut AlignmentData>,
         target_stop_position: Option<usize>,
     ) -> anyhow::Result<()> {
-        let mut best_score: Option<&mut usize> = self.edit_distance.as_mut();
-        let word_size = usize::try_from(WORD_SIZE)?;
+        let best_score: &mut Option<usize> = &mut self.edit_distance;
+        let word_size = WORD_SIZE as isize;
 
         if target_stop_position.is_some() && align_data.is_some() {
             bail!("Cannot set alignment and target_stop_position at same time.");
@@ -252,7 +253,10 @@ impl Alignment {
         // The cells below the band.
         let mut last_block_idx = std::cmp::min(
             max_num_blocks,
-            ceil_div!(std::cmp::min(k, (k + query_len - target.len() / 2) + 1), word_size),
+            ceil_div!(
+                std::cmp::min(k, (k + query_len - target.len() / 2) + 1),
+                word_size as usize
+            ),
         ) - 1;
 
         // Initialize blocks to some score and default bit vecs.
@@ -260,7 +264,7 @@ impl Alignment {
             .map(|blk_n| Block {
                 p: Word::MAX,
                 m: 0,
-                score: ((blk_n + 1) * word_size) as isize,
+                score: ((blk_n as isize + 1) * word_size),
             })
             .collect();
 
@@ -273,8 +277,12 @@ impl Alignment {
         // }
 
         // Iterate thru columns.
-        for c in target.iter() {
+        let target_len = target.len() as isize;
+        let query_len = query_len as isize;
+
+        for (idx_c, c) in target.iter().enumerate() {
             let col_idx = *c * max_num_blocks;
+            let c_isize = *c as isize;
 
             // Init to hout of 1. Can range from 0, 1, and -1.
             let mut hout: isize = 1;
@@ -292,7 +300,7 @@ impl Alignment {
                 block.score += hout;
             }
 
-            let mut last_block = &mut blocks[last_block_idx - 1];
+            let mut last_block = &mut blocks[last_block_idx];
             // Update k. I do it only on end of column because it would slow calculation too much otherwise. (Martinsos)
             // NOTICE: I add W when in last block because it is actually result from W cells to the left and W cells up. (Martinsos)
             /*
@@ -307,25 +315,25 @@ impl Alignment {
                 + (lastBlock == maxNumBlocks - 1 ? W : 0)
             */
             let cmp = last_block.score
-                + isize::try_from(
-                    std::cmp::max(
-                        target.len() - *c - 1,
-                        query_len - ((1 + last_block_idx) * word_size - 1) - 1,
-                    ) + if last_block_idx == max_num_blocks - 1 {
-                        w
-                    } else {
-                        0
-                    },
-                )?;
+                + std::cmp::max(
+                    target_len - c_isize - 1,
+                    query_len - ((1 + last_block_idx as isize) * word_size - 1) - 1,
+                )
+                + if last_block_idx == max_num_blocks - 1 {
+                    w.try_into()?
+                } else {
+                    0
+                };
             k = std::cmp::min(k, cmp.try_into()?);
+            let k_isize = k as isize;
 
             // Adjust number of blocks accoring to Ukkonen (Martinsos)
             // Adjust last block (Martinsos)
             // If block is not beneath band, calculate next block. Only next because others are certainly beneath band. (Martinsos)
             if last_block_idx + 1 < max_num_blocks
-                && (last_block_idx + 1) * word_size - 1
-                    <= k - usize::try_from(last_block.score)? + 2 * word_size - 2 - target.len()
-                        + c
+                && (last_block_idx as isize + 1) * word_size - 1
+                    <= k_isize - last_block.score + 2 * word_size - 2 - target_len
+                        + c_isize
                         + query_len
             {
                 let prev_block_score = blocks[last_block_idx].score;
@@ -338,7 +346,7 @@ impl Alignment {
                 let peq_c = peq[col_idx + last_block_idx];
 
                 let new_hout = last_block.calculate_hout_delta(peq_c, hout)?;
-                last_block.score = prev_block_score - hout + isize::try_from(word_size)? + new_hout;
+                last_block.score = prev_block_score - hout + word_size + new_hout;
 
                 // // Original impl never uses? Why?
                 // hout = new_hout
@@ -348,11 +356,10 @@ impl Alignment {
             // NOTE: Condition used here is more loose than the one from the article, since I simplified the max() part of it. (Martinsos)
             // I could consider adding that max part, for optimal performance. (Martinsos)
             // TODO: This might overflow.
-            while last_block_idx >= first_block_idx
-                && last_block.score >= (k + word_size).try_into()?
-                || (last_block_idx + 1) * word_size - 1
-                    > k - usize::try_from(last_block.score)? + 2 * word_size - 2 - target.len()
-                        + c
+            while last_block_idx >= first_block_idx && last_block.score >= k_isize + word_size
+                || (last_block_idx as isize + 1) * word_size - 1
+                    > k_isize - last_block.score + 2 * word_size - 2 - target_len
+                        + c_isize
                         + query_len
                         + 1
             {
@@ -362,19 +369,19 @@ impl Alignment {
             // Adjust first block (Martinsos)
             // While outside of band, advance block (Martinsos)
             while first_block_idx <= last_block_idx
-                && (blocks[first_block_idx].score >= (k + word_size).try_into()?
-                    || ((first_block_idx + 1) * word_size - 1
-                        < (blocks[first_block_idx].score
-                            - isize::try_from(k - target.len() + query_len + c)?)
-                        .try_into()?))
+                && (blocks[first_block_idx].score >= k_isize + word_size
+                    || (first_block_idx as isize + 1) * word_size - 1
+                        < (blocks[first_block_idx].score - k_isize - target_len
+                            + query_len
+                            + c_isize))
             {
                 first_block_idx += 1;
             }
 
             // TODO: consider if this part is useful, it does not seem to help much
-            let k: isize = k.try_into()?;
+            if idx_c % STRONG_REDUCE_NUM == 0 {
+                let word_size = word_size as usize;
 
-            if c % STRONG_REDUCE_NUM == 0 {
                 // Every some columns do more expensive but more efficient reduction
                 'outer: while last_block_idx >= first_block_idx {
                     // If all cells outside of band remove block.
@@ -388,9 +395,9 @@ impl Alignment {
 
                     for score in scores.iter().take(word_size).skip(word_size - num_cells) {
                         // TODO: Does not work if do not put +1! Why???
-                        if (*score <= k)
+                        if (*score <= k_isize)
                             && (isize::try_from(r)?
-                                <= k - score - isize::try_from(target.len() + c + query_len)? + 1)
+                                <= k_isize - score - target_len + c_isize + query_len + 1)
                         {
                             break 'outer;
                         }
@@ -411,9 +418,9 @@ impl Alignment {
 
                     for score in scores.iter().take(word_size).skip(word_size - num_cells) {
                         // TODO: Does not work if do not put +1! Why???
-                        if (*score <= k)
+                        if (*score <= k_isize)
                             && (isize::try_from(r)?
-                                <= k - score - isize::try_from(target.len() + c + query_len)? + 1)
+                                <= k_isize - score - target_len + c_isize + query_len + 1)
                         {
                             break 'outer;
                         }
@@ -432,7 +439,7 @@ impl Alignment {
 
             // Save column so it can be used for reconstruction
             if let Some(align_data) = align_data.as_mut() {
-                if *c < target.len() {
+                if idx_c < target.len() {
                     for (b, block) in blocks[first_block_idx..=last_block_idx].iter().enumerate() {
                         let idx = max_num_blocks + c + b;
                         align_data.ps[idx] = Some(block.p);
@@ -457,7 +464,7 @@ impl Alignment {
                     if let (Some(position), Some(stop_position)) =
                         (position.as_mut(), target_stop_position)
                     {
-                        **position = stop_position;
+                        *position = stop_position;
                     }
                     return Ok(());
                 }
@@ -468,10 +475,8 @@ impl Alignment {
         if last_block_idx == max_num_blocks - 1 {
             let last_best_score = &blocks[last_block_idx].get_cell_values()[w];
             if last_best_score <= &isize::try_from(k)? {
-                if let (Some(score), Some(pos)) = (best_score, position) {
-                    *score = usize::try_from(*last_best_score)?;
-                    *pos = target.len() - 1;
-                }
+                let _ = best_score.insert(usize::try_from(*last_best_score)?);
+                let _ = position.insert(target.len() - 1);
                 return Ok(());
             }
         }

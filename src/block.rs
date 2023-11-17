@@ -1,3 +1,5 @@
+use std::ops::BitAnd;
+
 use crate::align::{Word, HIGH_BIT_MASK, WORD_SIZE};
 
 #[derive(Debug, Clone, Default)]
@@ -32,7 +34,9 @@ impl Block {
 
         // This is instruction below written using 'if': if (hin < 0) Eq |= (Word)1;
         eq |= hin_is_neg;
-        let xh: Word = (((eq & self.p) + self.p) ^ self.p) | eq;
+
+        let (xh, _) = (eq & self.p).overflowing_add(self.p);
+        let xh: Word = (xh ^ self.p) | eq;
 
         let mut ph = self.m | !(xh | self.p);
         let mut mh = self.p & xh;

@@ -12,10 +12,9 @@ pub mod mode;
 pub mod peq;
 pub mod task;
 
-
 #[macro_export]
 /// Ceiling division.
-/// 
+///
 /// ```ignore
 /// assert_eq!(3, ceil_div!(5, 2))
 /// ```
@@ -26,3 +25,4 @@ macro_rules! ceil_div {
 }
 
 pub use align::Alignment;
+pub use config::AlignConfig;

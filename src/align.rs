@@ -1,8 +1,8 @@
 use anyhow::bail;
 
 use crate::{
-    cigar::EditOp, config::AlignConfig, equal::EqualityDefinition, mode::AlignMode,
-    peq::build_peq_table, task::AlignTask, ceil_div,
+    ceil_div, cigar::EditOp, config::AlignConfig, equal::EqualityDefinition, mode::AlignMode,
+    peq::build_peq_table, task::AlignTask,
 };
 
 /// Alias for single u64 bitvec word.
@@ -90,6 +90,7 @@ pub fn transform_sequences(query: &str, target: &str) -> (String, Vec<usize>, Ve
     (alphabet, transformed_query, transformed_target)
 }
 
+/// Alignment information.
 pub struct AlignmentData {
     pub ps: Vec<Option<Word>>,
     pub ms: Vec<Option<Word>>,
@@ -100,6 +101,10 @@ pub struct AlignmentData {
 
 impl AlignmentData {
     /// Init data.
+    ///
+    /// We build a complete table and mark first and last block for each column
+    /// (because algorithm is banded so only part of each columns is used).
+    /// TODO: do not build a whole table, but just enough blocks for each column.
     pub fn new(max_num_blocks: usize, target_len: usize) -> Self {
         AlignmentData {
             ps: vec![None; max_num_blocks * target_len],
@@ -178,7 +183,7 @@ impl Alignment {
 
         // Main Calculation
         let mut position_nw = None;
-        let mut align_data = AlignmentData::new(max_num_blocks, target.len());
+        // let mut align_data = AlignmentData::new(max_num_blocks, target.len());
         let mut dynamic_k = false;
         let mut k = config.k.unwrap_or_else(|| {
             dynamic_k = true;
@@ -195,8 +200,8 @@ impl Alignment {
                         transformed_query.len(),
                         &transformed_target,
                         k,
-                        position_nw.as_mut(),
-                        Some(&mut align_data),
+                        &mut position_nw,
+                        None,
                         None,
                     )?;
                 }
@@ -295,9 +300,12 @@ impl Alignment {
         // Find alignment -> all comes down to finding alignment for NW.
         // Currently we return alignment only for first pair of locations.
         if config.task == AlignTask::Path {
-            let (Some(aln_start_loc), Some(aln_end_loc))= (
-                alignment.start_locations.as_ref().map(|start_locs| start_locs[0]),
-                alignment.end_locations.as_ref().map(|end_locs| end_locs[0])
+            let (Some(aln_start_loc), Some(aln_end_loc)) = (
+                alignment
+                    .start_locations
+                    .as_ref()
+                    .map(|start_locs| start_locs[0]),
+                alignment.end_locations.as_ref().map(|end_locs| end_locs[0]),
             ) else {
                 bail!("No start locations.")
             };

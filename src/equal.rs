@@ -47,14 +47,14 @@ impl EqualityDefinition {
     /// );
     /// ```
     pub fn new(alphabet: &str, added_equalities: Option<&[EqualityPair]>) -> Self {
-        let mut matrix = vec!(false; MAX_UCHAR * MAX_UCHAR);
+        let mut matrix = vec![false; MAX_UCHAR * MAX_UCHAR];
 
         // (1,2) = 7
         /*
-            * * * 
-            * * *
-            * * *
-        */
+         * * *
+         * * *
+         * * *
+         */
         for x in 0..alphabet.len() {
             for y in 0..alphabet.len() {
                 matrix[(y * alphabet.len()) + x] = x == y
@@ -109,11 +109,11 @@ impl EqualityDefinition {
     /// eq_def.are_equal('Z', 'Z');
     /// ```
     pub fn are_equal(&self, a: char, b: char) -> anyhow::Result<bool> {
-        let (Some(pos_x), Some(pos_y)) = (
-            self.alphabet.find(a),
-            self.alphabet.find(b)
-        ) else {
-            bail!("One or more characters ({a}, {b}) do not exist in alphabet {}", self.alphabet);
+        let (Some(pos_x), Some(pos_y)) = (self.alphabet.find(a), self.alphabet.find(b)) else {
+            bail!(
+                "One or more characters ({a}, {b}) do not exist in alphabet {}",
+                self.alphabet
+            );
         };
         Ok(self[(pos_x, pos_y)])
     }
